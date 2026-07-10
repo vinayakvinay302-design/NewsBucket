@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NewsBucket</title>
+<style>
+  :root {
+    --bg: #FFFFFF; --surface: #F7F8FA;
+    --text-primary: #1A1D21; --text-secondary: #5B6470; --text-tertiary: #8B93A1;
+    --brand-primary: #1652F0; --brand-accent: #FF6B35;
+    --fact-high: #1B9E5B; --fact-medium: #E8A93A; --fact-low: #E5484D;
+    --border: #E7E9EC;
+    --radius: 16px;
+  }
+  [data-theme="dark"] {
+    --bg: #121316; --surface: #1B1D21;
+    --text-primary: #F2F3F5; --text-secondary: #A6ADB8; --text-tertiary: #6E7580;
+    --brand-primary: #5B8CFF; --brand-accent: #FF8659;
+    --border: #2A2D32;
+  }
+  [data-theme="amoled"] {
+    --bg: #000000; --surface: #000000;
+    --text-primary: #F2F3F5; --text-secondary: #A6ADB8; --text-tertiary: #6E7580;
+    --brand-primary: #5B8CFF; --brand-accent: #FF8659;
+    --border: #232323;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg); color: var(--text-primary);
+    transition: background 200ms, color 200ms;
+  }
+  .app-shell { max-width: 720px; margin: 0 auto; min-height: 100vh; padding-bottom: 72px; }
+  header.topbar {
+    position: sticky; top: 0; z-index: 10; background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .brand span { color: var(--brand-primary); }
+  .theme-toggle { display: flex; gap: 6px; }
+  .theme-toggle button {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary);
+    border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer;
+  }
+  .theme-toggle button.active { background: var(--brand-primary); color: white; border-color: var(--brand-primary); }
+
+  .tabs { display: flex; gap: 20px; padding: 0 16px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tabs button {
+    background: none; border: none; padding: 12px 0; font-size: 13px; font-weight: 600;
+    color: var(--text-tertiary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .tabs button.active { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
+
+  main { padding: 16px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 12px; cursor: pointer; animation: fadeIn 300ms ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; margin-bottom: 12px; background: var(--border); }
+  .overline { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-primary); }
+  .breaking-tag { color: var(--brand-accent); }
+  .headline { font-size: 20px; font-weight: 600; line-height: 1.3; margin: 4px 0 6px; }
+  .one-liner { font-size: 15px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; }
+  .meta-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-tertiary); }
+  .spacer { flex: 1; }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+  .badge.high { color: var(--fact-high); background: color-mix(in srgb, var(--fact-high) 15%, transparent); }
+  .badge.medium { color: var(--fact-medium); background: color-mix(in srgb, var(--fact-medium) 15%, transparent); }
+  .badge.low { color: var(--fact-low); background: color-mix(in srgb, var(--fact-low) 15%, transparent); }
+
+  .skeleton { background: var(--surface); border-radius: var(--radius); height: 220px; margin-bottom: 12px;
+    background-image: linear-gradient(90deg, var(--surface) 0px, var(--border) 40px, var(--surface) 80px);
+    background-size: 600px; animation: shimmer 1.4s infinite linear; }
+  @keyframes shimmer { from { background-position: -300px 0; } to { background-position: 300px 0; } }
+
+  .detail-hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: var(--border); }
+  .back-btn { background: none; border: none; color: var(--text-secondary); font-size: 14px; cursor: pointer; padding: 8px 0 16px; }
+  .summary-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 16px 0; }
+  .summary-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+  .summary-toggle button { border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary);
+    border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  .summary-toggle button.active { background: var(--brand-primary); color: white; border-color: var(--brand-primary); }
+  .summary-body ul { margin: 0; padding-left: 18px; }
+  .summary-body li { margin-bottom: 6px; font-size: 14px; }
+  .body-text { font-size: 16px; line-height: 1.7; color: var(--text-primary); }
+  .body-text p { margin: 0 0 16px; }
+
+  .trust-row { display: flex; gap: 10px; margin: 12px 0; }
+  .trust-chip { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); }
+
+  .source-rail { display: flex; gap: 10px; overflow-x: auto; margin: 16px 0; }
+  .source-chip { flex: 0 0 auto; width: 220px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; cursor: pointer; font-size: 13px; }
+  .source-chip .pub { font-weight: 600; margin-bottom: 4px; }
+
+  .chat-fab { position: fixed; bottom: 24px; right: 50%; transform: translateX(360px);
+    background: var(--brand-primary); color: white; border: none; border-radius: 999px;
+    padding: 12px 18px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+  @media (max-width: 760px) { .chat-fab { right: 16px; transform: none; } }
+  .chat-sheet { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+  .chat-sheet.open { display: flex; }
+  .chat-panel { background: var(--bg); width: 100%; max-width: 720px; max-height: 80vh; border-radius: 20px 20px 0 0;
+    padding: 16px; display: flex; flex-direction: column; }
+  .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .chat-log { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .chat-msg { margin-bottom: 12px; font-size: 14px; line-height: 1.5; }
+  .chat-msg.user { text-align: right; color: var(--brand-primary); font-weight: 500; }
+  .chat-msg.assistant { color: var(--text-primary); }
+  .chat-msg .citations { margin-top: 6px; font-size: 11px; color: var(--text-tertiary); }
+  .chat-input-row { display: flex; gap: 8px; margin-top: 8px; }
+  .chat-input-row input { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    background: var(--surface); color: var(--text-primary); font-size: 14px; }
+  .chat-input-row button { background: var(--brand-primary); color: white; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+
+  .empty, .error { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  footer.note { text-align: center; font-size: 11px; color: var(--text-tertiary); padding: 24px 16px; }
+</style>
+</head>
+<body data-theme="light">
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">News<span>Bucket</span></div>
+    <div class="theme-toggle">
+      <button data-theme-btn="light" class="active">Light</button>
+      <button data-theme-btn="dark">Dark</button>
+      <button data-theme-btn="amoled">AMOLED</button>
+    </div>
+  </header>
+  <nav class="tabs">
+    <button data-tab="home" class="active">For You</button>
+    <button data-tab="breaking">Breaking</button>
+    <button data-tab="technology">Technology</button>
+    <button data-tab="business">Business</button>
+    <button data-tab="cricket">Cricket</button>
+  </nav>
+  <main id="main"></main>
+  <footer class="note">NewsBucket static demo — all data is local to this page, nothing is sent to a server.</footer>
+</div>
+
+<button class="chat-fab" id="chatFab" style="display:none;">💬 Chat with News</button>
+<div class="chat-sheet" id="chatSheet">
+  <div class="chat-panel">
+    <div class="chat-header">
+      <strong>Chat with News</strong>
+      <button id="closeChat" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-secondary);">✕</button>
+    </div>
+    <div class="chat-log" id="chatLog"></div>
+    <div class="chat-input-row">
+      <input id="chatInput" placeholder="Ask a question about this article…" />
+      <button id="sendChat">Ask</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Seed data -- shaped like the NewsBucket production schema
+   (see docs/05-Database-Schema.md), embedded directly here since
+   this is a static, no-backend build for GitHub Pages.
+   ============================================================ */
+const nowTs = Date.now();
+const minutesAgo = (m) => new Date(nowTs - m * 60 * 1000).toISOString();
+
+const publishers = {
+  p1: { name: 'The Daily Ledger', trust_score: 8.7, bias_rating: 'center', is_verified_partner: true },
+  p2: { name: 'National Herald Wire', trust_score: 7.9, bias_rating: 'lean_left', is_verified_partner: true },
+  p3: { name: 'Bharat Business Post', trust_score: 8.2, bias_rating: 'lean_right', is_verified_partner: true },
+  p4: { name: 'Sportsline India', trust_score: 8.9, bias_rating: 'center', is_verified_partner: true },
+};
+
+const articles = [
+  {
+    id: 'art-1001', cluster_id: 'cluster-501', publisher: publishers.p1, category_slug: 'technology',
+    headline: 'India unveils national AI compute grid to cut research costs for startups',
+    hero_image_url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800',
+    author_name: 'Ritu Sharma', published_at: minutesAgo(42), is_breaking: true,
+    factuality_score: 9.1, bias_rating: 'center',
+    body_text: "The Ministry of Electronics and IT announced Tuesday a new national AI compute grid, giving startups and university labs subsidized access to GPU clusters previously out of reach for smaller teams. The program allocates an initial 10,000 GPUs across four data centers in Pune, Hyderabad, Bengaluru, and Noida. Officials said the first allocations will go to 200 startups selected through a competitive application process opening next month. The initiative is funded through a public-private partnership with three domestic cloud providers, with total committed funding of 4,500 crore rupees over three years. Industry groups welcomed the move, noting that compute costs have been the single largest barrier for Indian AI startups compared to well-funded counterparts in the US and China.",
+    ai_summary: {
+      one_line: 'India launches a subsidized national GPU grid to lower AI compute costs for startups.',
+      bullets: [
+        '10,000 GPUs across 4 cities allocated to startups and university labs.',
+        'First cohort of 200 startups selected via application starting next month.',
+        '₹4,500 crore committed over three years via public-private partnership.',
+      ],
+      eli5: "The government is buying a lot of powerful computers and letting small AI companies use them cheaply, so they don't have to spend huge amounts of money to build their own.",
+    },
+  },
+  {
+    id: 'art-1002', cluster_id: 'cluster-501', publisher: publishers.p2, category_slug: 'technology',
+    headline: 'Startups cautiously optimistic about new government AI compute program',
+    hero_image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800',
+    author_name: 'Devansh Rao', published_at: minutesAgo(35), is_breaking: false,
+    factuality_score: 8.4, bias_rating: 'lean_left',
+    body_text: "Founders reacted with cautious optimism to Tuesday's announcement of a national AI compute grid, though several raised concerns about how the 200 initial allocation slots will be judged. 'The devil will be in the selection criteria,' said one Bengaluru-based founder who requested anonymity. The Ministry has not yet published detailed eligibility rules. Some critics also questioned whether four data center locations are sufficient given the geographic spread of India's startup ecosystem, with several hubs in the northeast and other regions left without a nearby facility.",
+    ai_summary: {
+      one_line: 'Founders welcome the AI compute program but want clearer selection criteria.',
+      bullets: [
+        'Concerns raised about how the 200 startup slots will be selected.',
+        'Eligibility rules not yet published by the Ministry.',
+        'Some question geographic coverage of the four data center locations.',
+      ],
+      eli5: 'Some AI company founders are happy about the free computer access but worried the rules for who gets picked are not clear yet.',
+    },
+  },
+  {
+    id: 'art-2001', cluster_id: null, publisher: publishers.p3, category_slug: 'business',
+    headline: 'Gold prices ease as investors book profits ahead of RBI policy meeting',
+    hero_image_url: 'https://images.unsplash.com/photo-1610375461369-d613b564f4c4?w=800',
+    author_name: 'Meera Iyer', published_at: minutesAgo(90), is_breaking: false,
+    factuality_score: 8.0, bias_rating: 'lean_right',
+    body_text: "Gold prices in domestic markets eased 0.8% on Tuesday as investors booked profits ahead of the Reserve Bank of India's monetary policy announcement expected Thursday. Analysts said a pause or cut in interest rates could renew demand for gold as a hedge, but near-term profit-booking dominated trading. Silver moved in tandem, down 1.1% for the session. Jewellers reported steady retail demand ahead of the upcoming festival season despite the price pullback.",
+    ai_summary: {
+      one_line: "Gold eased 0.8% on profit booking ahead of Thursday's RBI rate decision.",
+      bullets: [
+        'Domestic gold prices fell 0.8%, silver down 1.1%.',
+        "Traders positioning ahead of Thursday's RBI policy announcement.",
+        'Retail jewellery demand reported steady ahead of festival season.',
+      ],
+      eli5: 'The price of gold went down a little bit because traders are waiting to see what the bank decides about interest rates later this week.',
+    },
+  },
+  {
+    id: 'art-3001', cluster_id: null, publisher: publishers.p4, category_slug: 'cricket',
+    headline: 'India seal series win with dominant seven-wicket victory in decider',
+    hero_image_url: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800',
+    author_name: 'Karan Mehta', published_at: minutesAgo(15), is_breaking: true,
+    factuality_score: 9.3, bias_rating: 'center',
+    body_text: "India completed a comprehensive seven-wicket win in the series decider on Tuesday, chasing down a target of 214 with 22 balls to spare. A composed 78 not out anchored the chase after early wickets put the innings under pressure. The bowlers had earlier restricted the opposition to 213 all out, with a career-best five-wicket haul doing the early damage. The result seals a 2-1 series victory and continues India's unbeaten home record this season.",
+    ai_summary: {
+      one_line: 'India won the series decider by seven wickets, taking the series 2-1.',
+      bullets: [
+        'Chased down 214 with 22 balls remaining.',
+        'An unbeaten 78 anchored the run chase after early wickets fell.',
+        'Bowler took a career-best five-wicket haul to restrict the opposition to 213.',
+      ],
+      eli5: 'The Indian cricket team won the last and most important match of the series, finishing the series ahead 2 wins to 1.',
+    },
+  },
+];
+
+/* ============================================================
+   Grounded "Chat with News" logic -- real grounding + refusal,
+   answers only from the article's own text (plus cluster
+   siblings), same contract as docs/08-AI-Features.md.
+   ============================================================ */
+const STOPWORDS = new Set([
+  'what', 'when', 'where', 'which', 'this', 'that', 'about', 'will', 'does',
+  'have', 'their', 'they', 'there', 'from', 'with', 'been', 'were', 'happen',
+]);
+
+function answerFromSources(question, sourceArticles) {
+  const REFUSAL = "I don't have enough information in these sources to answer that.";
+  const questionWords = question.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/)
+    .filter((w) => w.length > 3 && !STOPWORDS.has(w));
+
+  if (questionWords.length === 0) return { answer: REFUSAL, citations: [], grounded: false };
+
+  const scored = sourceArticles.map((src, idx) => {
+    const sentences = src.body_text.split(/(?<=[.!?])\s+/);
+    const hits = sentences.map((s) => ({
+      sentence: s,
+      score: questionWords.reduce((acc, w) => acc + (s.toLowerCase().includes(w) ? 1 : 0), 0),
+    })).filter((h) => h.score > 0).sort((a, b) => b.score - a.score);
+    return { idx, src, hits };
+  });
+
+  // Require at least 2 distinct keyword matches (or all keywords, if only 1)
+  // before treating it as real grounding -- prevents a single incidental
+  // word overlap from producing a fabricated-looking answer.
+  const minScore = Math.min(2, questionWords.length);
+  const withHits = scored
+    .map((s) => ({ ...s, hits: s.hits.filter((h) => h.score >= minScore) }))
+    .filter((s) => s.hits.length > 0);
+
+  if (withHits.length === 0) return { answer: REFUSAL, citations: [], grounded: false };
+
+  const parts = [];
+  const citations = [];
+  withHits.forEach(({ idx, src, hits }) => {
+    const best = hits[0].sentence.trim();
+    parts.push(`${best} [Source ${idx + 1}]`);
+    citations.push({ publisher_name: src.publisher.name, excerpt: best.slice(0, 180) });
+  });
+
+  return { answer: parts.join(' '), citations, grounded: true };
+}
+
+/* ============================================================
+   UI rendering -- same behavior as the server-backed prototype,
+   just reading `articles` directly instead of calling an API.
+   ============================================================ */
+let currentArticleId = null;
+
+document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.body.setAttribute('data-theme', btn.dataset.themeBtn);
+    document.querySelectorAll('[data-theme-btn]').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+document.querySelectorAll('[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b === btn));
+    renderFeed(btn.dataset.tab);
+  });
+});
+
+function relativeTime(iso) {
+  const diffMin = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (diffMin < 60) return diffMin + 'm ago';
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return diffH + 'h ago';
+  return Math.round(diffH / 24) + 'd ago';
+}
+
+function factualityBadge(score) {
+  if (score == null) return '';
+  const tier = score >= 8.5 ? 'high' : score >= 6.5 ? 'medium' : 'low';
+  const label = tier === 'high' ? 'High factuality' : tier === 'medium' ? 'Medium factuality' : 'Low factuality';
+  return `<span class="badge ${tier}" title="${label}: ${score}/10">● ${score}</span>`;
+}
+
+function renderFeed(tab) {
+  const main = document.getElementById('main');
+  document.getElementById('chatFab').style.display = 'none';
+  main.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
+
+  setTimeout(() => {
+    let list = articles.slice().sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    if (tab === 'breaking') list = list.filter(a => a.is_breaking);
+    else if (tab !== 'home') list = list.filter(a => a.category_slug === tab);
+
+    if (list.length === 0) {
+      main.innerHTML = `<div class="empty">No articles in this category right now.<br/>Check back soon.</div>`;
+      return;
+    }
+
+    main.innerHTML = list.map(a => `
+      <div class="card" onclick="openArticle('${a.id}')">
+        <img src="${a.hero_image_url}" alt="" />
+        <div class="overline ${a.is_breaking ? 'breaking-tag' : ''}">${a.is_breaking ? '● BREAKING · ' : ''}${a.category_slug.toUpperCase()}</div>
+        <div class="headline">${a.headline}</div>
+        <div class="one-liner">${a.ai_summary.one_line}</div>
+        <div class="meta-row">
+          <span>${a.publisher.name}</span><span>·</span><span>${relativeTime(a.published_at)}</span>
+          <div class="spacer"></div>
+          ${factualityBadge(a.factuality_score)}
+        </div>
+      </div>
+    `).join('');
+  }, 180);
+}
+
+function openArticle(id) {
+  currentArticleId = id;
+  const main = document.getElementById('main');
+  const detail = articles.find(a => a.id === id);
+  const sources = detail.cluster_id ? articles.filter(a => a.cluster_id === detail.cluster_id && a.id !== id) : [];
+
+  main.innerHTML = `<div class="skeleton" style="height:400px;"></div>`;
+
+  setTimeout(() => {
+    main.innerHTML = `
+      <button class="back-btn" onclick="renderFeed('home'); document.querySelectorAll('[data-tab]').forEach((b,i)=>b.classList.toggle('active', i===0));">← Back to feed</button>
+      <img class="detail-hero" src="${detail.hero_image_url}" alt="" />
+      <div class="headline" style="font-size:26px; margin-top:16px;">${detail.headline}</div>
+      <div class="meta-row" style="margin-top:8px;">
+        <span>${detail.author_name}</span><span>·</span><span>${detail.publisher.name}</span><span>·</span><span>${relativeTime(detail.published_at)}</span>
+      </div>
+      <div class="trust-row">
+        ${factualityBadge(detail.factuality_score)}
+        <span class="trust-chip">Bias: ${detail.bias_rating.replace('_',' ')}</span>
+        ${detail.publisher.is_verified_partner ? '<span class="trust-chip">✓ Verified partner</span>' : ''}
+      </div>
+      <div class="summary-panel">
+        <div class="summary-toggle">
+          <button data-mode="bullets" class="active">Bullets</button>
+          <button data-mode="full">Full</button>
+          <button data-mode="eli5">ELI5</button>
+        </div>
+        <div class="summary-body" id="summaryBody"></div>
+      </div>
+      <div class="body-text"><p>${detail.body_text.replace(/\n\n/g, '</p><p>')}</p></div>
+      ${sources.length > 0 ? `
+        <div class="overline" style="margin-top:20px;">OTHER OUTLETS COVERING THIS</div>
+        <div class="source-rail">
+          ${sources.map(s => `
+            <div class="source-chip" onclick="openArticle('${s.id}')">
+              <div class="pub">${s.publisher.name}</div>
+              <div style="color:var(--text-secondary)">${s.headline}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      <div style="height:60px;"></div>
+    `;
+
+    const summaryData = detail.ai_summary;
+    function renderSummary(mode) {
+      const el = document.getElementById('summaryBody');
+      if (mode === 'bullets') el.innerHTML = `<ul>${summaryData.bullets.map(b => `<li>${b}</li>`).join('')}</ul>`;
+      else if (mode === 'eli5') el.innerHTML = `<div>${summaryData.eli5}</div>`;
+      else el.innerHTML = `<div>${summaryData.one_line}</div>`;
+    }
+    renderSummary('bullets');
+    main.querySelectorAll('.summary-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        main.querySelectorAll('.summary-toggle button').forEach(b => b.classList.toggle('active', b === btn));
+        renderSummary(btn.dataset.mode);
+      });
+    });
+
+    document.getElementById('chatFab').style.display = 'block';
+    document.getElementById('chatLog').innerHTML = '';
+  }, 150);
+}
+
+document.getElementById('chatFab').addEventListener('click', () => document.getElementById('chatSheet').classList.add('open'));
+document.getElementById('closeChat').addEventListener('click', () => document.getElementById('chatSheet').classList.remove('open'));
+
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const question = input.value.trim();
+  if (!question || !currentArticleId) return;
+  const log = document.getElementById('chatLog');
+  log.innerHTML += `<div class="chat-msg user">${question}</div>`;
+  input.value = '';
+  log.scrollTop = log.scrollHeight;
+
+  const article = articles.find(a => a.id === currentArticleId);
+  const clusterSiblings = article.cluster_id ? articles.filter(a => a.cluster_id === article.cluster_id && a.id !== article.id) : [];
+  const { answer, citations, grounded } = answerFromSources(question, [article, ...clusterSiblings]);
+
+  log.innerHTML += `<div class="chat-msg assistant">${answer}${
+    grounded && citations.length ? `<div class="citations">Sources: ${citations.map(c => c.publisher_name).join(', ')}</div>` : ''
+  }</div>`;
+  log.scrollTop = log.scrollHeight;
+}
+document.getElementById('sendChat').addEventListener('click', sendChatMessage);
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatMessage(); });
+
+renderFeed('home');
+</script>
+</body>
+</html>
