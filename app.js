@@ -71,114 +71,6 @@ function answerFromSources(question, sourceArticles) {
   return { answer: parts.join(' '), citations, grounded: true };
 }
 
-/* ============================================================
-   Live Headlines -- real news pulled directly in the browser from
-   real publishers' public RSS feeds, via a free RSS-to-JSON bridge
-   (rss2json.com) since browsers can't fetch raw cross-origin RSS
-   without one. No API key, no backend, no signup.
-
-   IMPORTANT LIMITATION: this pulls real external content, unlike the
-   curated demo articles above, so every field is HTML-escaped before
-   being inserted into the page -- treat anything from the network as
-   untrusted. Live items also don't have AI summaries/bias scores (no
-   backend to generate them), so they render as simple linked cards
-   that open the original source in a new tab, rather than the full
-   AI-annotated card used for the curated demo content.
-
-   If a feed is down, rate-limited, or the network is unavailable,
-   that single feed is skipped -- the page never breaks, it just shows
-   whatever feeds succeeded, or a clear retry message if all failed.
-   ============================================================ */
-const LIVE_FEEDS = [
-  { name: 'BBC World', url: 'http://feeds.bbci.co.uk/news/world/rss.xml' },
-  { name: 'BBC Football', url: 'http://feeds.bbci.co.uk/sport/football/rss.xml' },
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
-  { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
-];
-const RSS_BRIDGE = 'https://api.rss2json.com/v1/api.json?rss_url=';
-const LIVE_REFRESH_MS = 10 * 60 * 1000; // 10 minutes
-let liveRefreshTimer = null;
-let liveCache = [];
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
-}
-
-function stripTags(html) {
-  const div = document.createElement('div');
-  div.innerHTML = html || '';
-  // textContent walks into <script>/<style> children and returns their raw
-  // source as text (they never execute since this is set via innerHTML,
-  // but their JS/CSS source would otherwise visibly leak into the summary
-  // text) -- remove them explicitly before extracting text.
-  div.querySelectorAll('script, style').forEach(el => el.remove());
-  return div.textContent || div.innerText || '';
-}
-
-async function fetchOneFeed(feed) {
-  const res = await fetch(RSS_BRIDGE + encodeURIComponent(feed.url) + '&count=6');
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.status !== 'ok' || !Array.isArray(json.items)) throw new Error('Bad feed response');
-  return json.items.map(item => ({
-    source: feed.name,
-    headline: stripTags(item.title || '').trim(),
-    summary: stripTags(item.description || '').trim().slice(0, 160),
-    link: item.link,
-    published_at: item.pubDate ? new Date(item.pubDate.replace(' ', 'T') + 'Z') : new Date(),
-  }));
-}
-
-async function loadLiveHeadlines(forceRefresh) {
-  const main = document.getElementById('main');
-  if (!forceRefresh && liveCache.length > 0) {
-    renderLiveHeadlines();
-    return;
-  }
-  main.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
-
-  const results = await Promise.allSettled(LIVE_FEEDS.map(fetchOneFeed));
-  const succeeded = results.filter(r => r.status === 'fulfilled');
-  const merged = succeeded.flatMap(r => r.value);
-
-  if (merged.length === 0) {
-    main.innerHTML = `<div class="error">
-      Couldn't load live headlines right now — this needs an internet connection
-      and the RSS bridge service to be reachable.<br/><br/>
-      <button class="refresh-btn" onclick="loadLiveHeadlines(true)">Try again</button>
-    </div>`;
-    return;
-  }
-
-  merged.sort((a, b) => b.published_at - a.published_at);
-  liveCache = merged;
-  renderLiveHeadlines();
-}
-
-function renderLiveHeadlines() {
-  const main = document.getElementById('main');
-  const failedCount = LIVE_FEEDS.length - new Set(liveCache.map(a => a.source)).size;
-  main.innerHTML = `
-    <div class="live-header-row">
-      <span class="last-updated">Updated ${relativeTime(new Date().toISOString())} · real headlines, no AI summary/scoring yet</span>
-      <button class="refresh-btn" onclick="loadLiveHeadlines(true)">↻ Refresh</button>
-    </div>
-    ${failedCount > 0 ? `<div class="live-note">${failedCount} of ${LIVE_FEEDS.length} sources unavailable right now — showing what loaded.</div>` : ''}
-    ${liveCache.map(a => `
-      <a class="live-card" href="${escapeHtml(a.link)}" target="_blank" rel="noopener noreferrer">
-        <div class="source-line">${escapeHtml(a.source)} · ${relativeTime(a.published_at.toISOString())}</div>
-        <div class="headline">${escapeHtml(a.headline)}</div>
-        ${a.summary ? `<div class="one-liner">${escapeHtml(a.summary)}</div>` : ''}
-      </a>
-    `).join('')}
-  `;
-}
-
-function stopLiveAutoRefresh() {
-  if (liveRefreshTimer) { clearInterval(liveRefreshTimer); liveRefreshTimer = null; }
-}
 
 /* ============================================================
    UI rendering
@@ -199,6 +91,7 @@ document.querySelectorAll('[data-tab]').forEach(btn => {
     document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b === btn));
     currentTab = btn.dataset.tab;
     stopLiveAutoRefresh();
+    stopCryptoAutoRefresh();
     document.getElementById('chatFab').style.display = 'none';
     if (currentTab === 'live') {
       loadLiveHeadlines(false);
@@ -295,27 +188,45 @@ function handleBookmarkClickDetail(id) {
 function renderFeed() {
   const main = document.getElementById('main');
   document.getElementById('chatFab').style.display = 'none';
+  // Centralized here (rather than in every caller) so no code path --
+  // tab clicks, the article detail "Back to feed" button, search -- can
+  // forget to clear a still-running crypto/live-strip refresh interval
+  // and leak a duplicate timer.
+  stopCryptoAutoRefresh();
   main.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
 
   setTimeout(() => {
     const list = getFilteredList();
+    const hasLiveFeed = !searchQuery && CATEGORY_FEEDS[currentTab];
+    const isCrypto = currentTab === 'crypto' && !searchQuery;
+
+    const topHtml =
+      (isCrypto ? '<div id="cryptoTicker" class="crypto-ticker"></div>' : '') +
+      (hasLiveFeed ? '<div id="categoryLiveStrip"></div>' : '');
 
     if (list.length === 0) {
       const msg = currentTab === 'bookmarks'
         ? 'Nothing saved yet.<br/>Tap the ♡ on any story to save it here.'
         : 'No articles match right now.<br/>Try a different tab or search term.';
-      main.innerHTML = `<div class="empty">${msg}</div>`;
-      return;
+      main.innerHTML = topHtml + `<div class="empty">${msg}</div>`;
+    } else {
+      let html = topHtml;
+      if (currentTab === 'home' && !searchQuery && list.length > 0) {
+        html += cardHtml(list[0], true);
+        html += list.slice(1).map(a => cardHtml(a, false)).join('');
+      } else {
+        html += list.map(a => cardHtml(a, false)).join('');
+      }
+      main.innerHTML = html;
     }
 
-    let html = '';
-    if (currentTab === 'home' && !searchQuery && list.length > 0) {
-      html += cardHtml(list[0], true);
-      html += list.slice(1).map(a => cardHtml(a, false)).join('');
-    } else {
-      html += list.map(a => cardHtml(a, false)).join('');
+    if (isCrypto) {
+      loadCryptoTicker(false);
+      cryptoRefreshTimer = setInterval(() => loadCryptoTicker(true), CRYPTO_REFRESH_MS);
     }
-    main.innerHTML = html;
+    if (hasLiveFeed) {
+      loadCategoryLiveStrip(currentTab);
+    }
   }, 160);
 }
 
